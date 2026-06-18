@@ -1,0 +1,682 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<title>Night Listener</title>
+<style>
+  :root{
+    --bg-0:#0a0e1c;
+    --bg-1:#0e1428;
+    --surface:#151c33;
+    --surface-2:#1b2440;
+    --line:#27314f;
+    --ink:#eef1fb;
+    --muted:#8b94b3;
+    --faint:#5b648a;
+    --moon:#7b97ff;
+    --quiet:#43c0a6;
+    --light:#e3ad5c;
+    --loud:#e6795f;
+    --epic:#df4c63;
+    --shadow:0 18px 50px -20px rgba(0,0,0,.7);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:
+      radial-gradient(120% 80% at 50% -10%, #16204a 0%, var(--bg-1) 45%, var(--bg-0) 100%);
+    color:var(--ink);
+    font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    min-height:100%;
+    display:flex;
+    justify-content:center;
+    -webkit-font-smoothing:antialiased;
+    overscroll-behavior:none;
+  }
+  .app{
+    width:100%;
+    max-width:520px;
+    min-height:100vh;
+    min-height:100dvh;
+    padding:22px 20px 36px;
+    display:flex;
+    flex-direction:column;
+  }
+
+  /* ---- header ---- */
+  .brand{
+    display:flex;align-items:center;gap:11px;
+    margin-bottom:6px;
+  }
+  .brand .dot{
+    width:34px;height:34px;border-radius:11px;
+    background:linear-gradient(155deg,#26305a,#10162c);
+    border:1px solid var(--line);
+    display:grid;place-items:center;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.05);
+  }
+  .brand .dot svg{width:18px;height:18px;}
+  .brand h1{
+    font-size:18px;font-weight:650;letter-spacing:-.01em;margin:0;
+  }
+  .brand .tag{font-size:12.5px;color:var(--muted);margin:1px 0 0;font-weight:480;}
+
+  /* ---- stage ---- */
+  .stage{
+    flex:1;
+    display:flex;flex-direction:column;align-items:center;justify-content:center;
+    gap:26px;
+    padding:14px 0;
+    text-align:center;
+  }
+
+  .orb-wrap{position:relative;width:240px;height:240px;display:grid;place-items:center;}
+  .orb-ring{
+    position:absolute;inset:0;border-radius:50%;
+    border:1px solid var(--line);
+    transition:border-color .6s ease;
+  }
+  .pulse{
+    position:absolute;width:150px;height:150px;border-radius:50%;
+    background:radial-gradient(circle at 50% 45%, rgba(123,151,255,.55), rgba(123,151,255,0) 70%);
+    transform:scale(.7);
+    will-change:transform,opacity;
+    transition:background .5s ease;
+  }
+  .orb-core{
+    position:relative;z-index:2;
+    width:128px;height:128px;border-radius:50%;
+    background:linear-gradient(160deg,var(--surface-2),var(--bg-1));
+    border:1px solid var(--line);
+    display:grid;place-items:center;
+    box-shadow:var(--shadow), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .orb-core .clock{
+    font-size:30px;font-weight:600;letter-spacing:.02em;
+    font-variant-numeric:tabular-nums;
+  }
+  .orb-core .clock .sub{display:block;font-size:11px;color:var(--muted);font-weight:520;letter-spacing:.08em;text-transform:uppercase;margin-top:3px;}
+
+  .status-line{min-height:46px;}
+  .status-head{font-size:21px;font-weight:600;letter-spacing:-.01em;margin:0 0 4px;}
+  .status-sub{font-size:13.5px;color:var(--muted);margin:0;line-height:1.5;max-width:330px;}
+
+  /* live mini meter */
+  .live-meter{
+    width:min(330px,86vw);height:64px;
+    border:1px solid var(--line);border-radius:14px;
+    background:var(--surface);
+    overflow:hidden;display:none;
+  }
+  .live-meter canvas{display:block;width:100%;height:100%;}
+
+  /* ---- buttons ---- */
+  .controls{display:flex;flex-direction:column;gap:12px;width:100%;}
+  button{font-family:inherit;cursor:pointer;border:none;}
+  .btn{
+    width:100%;padding:17px 20px;border-radius:16px;
+    font-size:16.5px;font-weight:600;letter-spacing:-.01em;
+    transition:transform .12s ease, filter .2s ease, background .2s ease;
+  }
+  .btn:active{transform:scale(.985);}
+  .btn-primary{background:linear-gradient(165deg,#7b97ff,#5f78f0);color:#0b1023;box-shadow:0 12px 30px -12px rgba(123,151,255,.7);}
+  .btn-stop{background:linear-gradient(165deg,#e6795f,#df4c63);color:#1a0d10;box-shadow:0 12px 30px -12px rgba(223,76,99,.6);}
+  .btn-ghost{background:var(--surface);color:var(--ink);border:1px solid var(--line);}
+  .btn:focus-visible{outline:2px solid var(--moon);outline-offset:3px;}
+
+  .awake-note{
+    display:none;align-items:center;justify-content:center;gap:7px;
+    font-size:12px;color:var(--muted);margin-top:2px;
+  }
+  .awake-note .led{width:7px;height:7px;border-radius:50%;background:var(--quiet);box-shadow:0 0 8px var(--quiet);}
+
+  /* ---- results ---- */
+  .results{display:none;flex-direction:column;gap:18px;}
+  .res-head{text-align:center;margin-bottom:2px;}
+  .score-big{
+    font-size:60px;font-weight:680;letter-spacing:-.03em;line-height:1;
+    font-variant-numeric:tabular-nums;
+  }
+  .score-label{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:8px;}
+  .score-verdict{font-size:15px;font-weight:560;margin-top:10px;}
+
+  .chart-card{
+    background:var(--surface);border:1px solid var(--line);border-radius:18px;
+    padding:16px 14px 12px;
+  }
+  .chart-card .ctitle{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;padding:0 2px;}
+  .chart-card .ctitle b{font-size:14px;font-weight:600;}
+  .chart-card .ctitle span{font-size:12px;color:var(--muted);}
+  .chart-card canvas{display:block;width:100%;height:170px;border-radius:8px;}
+  .axis{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-top:7px;padding:0 2px;font-variant-numeric:tabular-nums;}
+
+  .legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:center;margin-top:12px;}
+  .legend i{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);font-style:normal;}
+  .legend i b{width:11px;height:11px;border-radius:3px;display:inline-block;}
+
+  .stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
+  .stat{
+    background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:14px 15px;
+  }
+  .stat .k{font-size:12px;color:var(--muted);letter-spacing:.02em;}
+  .stat .v{font-size:23px;font-weight:640;margin-top:5px;font-variant-numeric:tabular-nums;letter-spacing:-.01em;}
+  .stat .v small{font-size:13px;font-weight:520;color:var(--muted);margin-left:3px;}
+
+  .breakdown{background:var(--surface);border:1px solid var(--line);border-radius:15px;padding:6px 16px;}
+  .brow{display:flex;justify-content:space-between;align-items:center;padding:11px 0;border-bottom:1px solid var(--line);font-size:14px;}
+  .brow:last-child{border-bottom:none;}
+  .brow .lab{display:flex;align-items:center;gap:9px;color:var(--ink);}
+  .brow .lab b{width:10px;height:10px;border-radius:3px;}
+  .brow .val{color:var(--muted);font-variant-numeric:tabular-nums;}
+
+  /* ---- error / setup ---- */
+  .note{
+    background:var(--surface);border:1px solid var(--line);border-radius:14px;
+    padding:14px 16px;font-size:13px;color:var(--muted);line-height:1.55;text-align:left;
+  }
+  .note b{color:var(--ink);font-weight:600;}
+  .hidden{display:none !important;}
+
+  @media (prefers-reduced-motion: reduce){
+    .pulse{transition:none!important;}
+    .btn:active{transform:none;}
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <div class="brand">
+    <span class="dot" aria-hidden="true">
+      <svg viewBox="0 0 24 24" fill="none" stroke="#7b97ff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 12h3l2-5 3 11 3-8 2 4h5"/>
+      </svg>
+    </span>
+    <div>
+      <h1>Night Listener</h1>
+      <p class="tag">Sound &amp; snore tracker · session only</p>
+    </div>
+  </div>
+
+  <!-- STAGE (idle / calibrate / recording) -->
+  <div class="stage" id="stage">
+    <div class="orb-wrap">
+      <div class="orb-ring" id="ring"></div>
+      <div class="pulse" id="pulse"></div>
+      <div class="orb-core">
+        <div class="clock" id="clock">Ready<span class="sub" id="clockSub">tap start</span></div>
+      </div>
+    </div>
+
+    <div class="status-line">
+      <h2 class="status-head" id="statHead">Listen through the night</h2>
+      <p class="status-sub" id="statSub">Place the phone face-down on the mattress or a nightstand within arm's reach. Keep it plugged in.</p>
+    </div>
+
+    <div class="live-meter" id="liveMeter"><canvas id="liveCanvas"></canvas></div>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="startBtn">Start listening</button>
+      <button class="btn btn-stop hidden" id="stopBtn">Stop &amp; see results</button>
+      <div class="awake-note" id="awakeNote"><span class="led"></span> Screen kept awake so recording continues</div>
+    </div>
+
+    <div class="note" id="errBox" style="display:none;"></div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results" id="results">
+    <div class="res-head">
+      <div class="score-big" id="scoreBig">0</div>
+      <div class="score-label">Snore Score</div>
+      <div class="score-verdict" id="verdict"></div>
+    </div>
+
+    <div class="chart-card">
+      <div class="ctitle"><b>The night, end to end</b><span id="chartRange"></span></div>
+      <canvas id="chart"></canvas>
+      <div class="axis"><span id="axStart">—</span><span id="axMid"></span><span id="axEnd">—</span></div>
+      <div class="legend">
+        <i><b style="background:var(--quiet)"></b>Quiet</i>
+        <i><b style="background:var(--light)"></b>Light</i>
+        <i><b style="background:var(--loud)"></b>Loud</i>
+        <i><b style="background:var(--epic)"></b>Epic</i>
+      </div>
+    </div>
+
+    <div class="stat-grid">
+      <div class="stat"><div class="k">Recorded</div><div class="v" id="sDur">—</div></div>
+      <div class="stat"><div class="k">Time snoring</div><div class="v" id="sSnore">—</div></div>
+      <div class="stat"><div class="k">Quiet share</div><div class="v" id="sQuiet">—<small>%</small></div></div>
+      <div class="stat"><div class="k">Loud episodes</div><div class="v" id="sLoud">—</div></div>
+    </div>
+
+    <div class="breakdown" id="breakdown"></div>
+
+    <div class="controls">
+      <button class="btn btn-ghost" id="saveBtn">Save chart as image</button>
+      <button class="btn btn-primary" id="againBtn">Record another night</button>
+    </div>
+    <div class="note">Nothing here is saved. Closing or reloading this page clears it — save the chart first if you want to keep it.</div>
+  </div>
+
+</div>
+
+<script>
+(() => {
+  "use strict";
+
+  // ---------- elements ----------
+  const $ = id => document.getElementById(id);
+  const stage=$("stage"), results=$("results");
+  const startBtn=$("startBtn"), stopBtn=$("stopBtn"), againBtn=$("againBtn"), saveBtn=$("saveBtn");
+  const clock=$("clock"), clockSub=$("clockSub"), statHead=$("statHead"), statSub=$("statSub");
+  const ring=$("ring"), pulse=$("pulse"), errBox=$("errBox");
+  const liveMeter=$("liveMeter"), liveCanvas=$("liveCanvas");
+  const awakeNote=$("awakeNote");
+
+  const COLORS=["#43c0a6","#e3ad5c","#e6795f","#df4c63"]; // quiet,light,loud,epic
+  const NAMES=["Quiet","Light snoring","Loud snoring","Epic snoring"];
+
+  // ---------- audio state ----------
+  let audioCtx=null, analyser=null, source=null, stream=null;
+  let timeBuf=null, freqBuf=null, sampleRate=48000, binHz=0;
+  let lowStart=0, lowEnd=0, fullEnd=0;
+
+  // ---------- session state ----------
+  let phase="idle";            // idle | calibrating | recording | done
+  let samples=[];              // per-second: {level 0-3, snore bool, db}
+  let baseline=null, calibBuf=[];
+  let startEpoch=0, lastSampleSec=-1;
+  let rafId=null, tickId=null, clockId=null;
+  let wakeLock=null;
+  let smoothVol=0;
+
+  // ---------- helpers ----------
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  function fmtClock(ms){
+    let s=Math.floor(ms/1000);
+    const h=Math.floor(s/3600); s-=h*3600;
+    const m=Math.floor(s/60); s-=m*60;
+    const p=n=>String(n).padStart(2,"0");
+    return h>0 ? `${h}:${p(m)}:${p(s)}` : `${p(m)}:${p(s)}`;
+  }
+  function fmtDur(sec){
+    const h=Math.floor(sec/3600), m=Math.round((sec%3600)/60);
+    if(h>0) return `${h}h ${m}m`;
+    if(m>0) return `${m}m`;
+    return `${sec}s`;
+  }
+  function clockTime(epoch){
+    return new Date(epoch).toLocaleTimeString([], {hour:"numeric", minute:"2-digit"});
+  }
+
+  // ---------- start ----------
+  async function start(){
+    errBox.style.display="none";
+    try{
+      stream = await navigator.mediaDevices.getUserMedia({
+        audio:{ echoCancellation:false, noiseSuppression:false, autoGainControl:false }
+      });
+    }catch(e){
+      showError(e);
+      return;
+    }
+
+    audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+    if(audioCtx.state==="suspended") await audioCtx.resume();
+    sampleRate = audioCtx.sampleRate;
+
+    analyser = audioCtx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0.4;
+    source = audioCtx.createMediaStreamSource(stream);
+    source.connect(analyser);
+
+    timeBuf = new Uint8Array(analyser.fftSize);
+    freqBuf = new Uint8Array(analyser.frequencyBinCount);
+    binHz = sampleRate / analyser.fftSize;
+    lowStart = Math.max(1, Math.floor(70/binHz));
+    lowEnd   = Math.floor(600/binHz);
+    fullEnd  = Math.floor(6000/binHz);
+
+    samples=[]; calibBuf=[]; baseline=null; lastSampleSec=-1;
+    requestWakeLock();
+
+    // calibrate for 6s
+    phase="calibrating";
+    startBtn.classList.add("hidden");
+    liveMeter.style.display="block";
+    sizeLiveCanvas();
+    statHead.textContent="Getting to know your room";
+    statSub.textContent="Stay quiet for a few seconds while it learns the background sound level.";
+    clock.firstChild.textContent="";
+    clockSub.textContent="calibrating";
+
+    let calibLeft=6;
+    clock.firstChild.textContent=calibLeft;
+    const calTimer=setInterval(()=>{
+      calibLeft--;
+      clock.firstChild.textContent = calibLeft>0?calibLeft:"";
+      if(calibLeft<=0){
+        clearInterval(calTimer);
+        beginRecording();
+      }
+    },1000);
+
+    loop(); // visual + sampling loop runs through calibration and recording
+  }
+
+  function beginRecording(){
+    // robust baseline = median of calibration dB
+    if(calibBuf.length){
+      const s=[...calibBuf].sort((a,b)=>a-b);
+      baseline = s[Math.floor(s.length/2)];
+    } else {
+      baseline = -55;
+    }
+    phase="recording";
+    startEpoch=Date.now();
+    stopBtn.classList.remove("hidden");
+    awakeNote.style.display= wakeLock!==null ? "flex":"none";
+    statHead.textContent="Listening…";
+    statSub.textContent="Leave the phone where it is. Don't lock the screen — it dims on its own and keeps recording.";
+    clockSub.textContent="elapsed";
+
+    clockId=setInterval(()=>{
+      clock.firstChild.textContent = fmtClock(Date.now()-startEpoch);
+    },1000);
+  }
+
+  // ---------- the loop ----------
+  function loop(){
+    rafId=requestAnimationFrame(loop);
+    if(!analyser) return;
+
+    // volume (RMS -> dB)
+    analyser.getByteTimeDomainData(timeBuf);
+    let sum=0;
+    for(let i=0;i<timeBuf.length;i++){ const v=(timeBuf[i]-128)/128; sum+=v*v; }
+    const rms=Math.sqrt(sum/timeBuf.length);
+    const db=20*Math.log10(rms+1e-7);   // ~ -70 .. 0
+
+    // live visual
+    const norm=Math.min(1,Math.max(0,(db+60)/60));
+    smoothVol = smoothVol + (norm-smoothVol)*0.25;
+    drawLive(smoothVol);
+    paintOrb(smoothVol, phase);
+
+    // calibration collection
+    if(phase==="calibrating"){ calibBuf.push(db); return; }
+    if(phase!=="recording") return;
+
+    // one classified sample per wall-clock second
+    const sec=Math.floor((Date.now()-startEpoch)/1000);
+    if(sec===lastSampleSec) return;
+    lastSampleSec=sec;
+
+    // frequency content for snore gating
+    analyser.getByteFrequencyData(freqBuf);
+    let low=0, full=0;
+    for(let i=1;i<=fullEnd;i++){ full+=freqBuf[i]; if(i>=lowStart&&i<=lowEnd) low+=freqBuf[i]; }
+    const lowRatio = full>0 ? low/full : 0;
+
+    const delta = db - baseline;
+    let level = 0;
+    if(delta>=22) level=3;
+    else if(delta>=13) level=2;
+    else if(delta>=6) level=1;
+
+    // snore = audible above floor AND low-frequency dominant (rumble),
+    // or simply very loud (epic) regardless.
+    const snore = (level>=1 && lowRatio>=0.45) || level>=3;
+
+    samples.push({level, snore, db});
+  }
+
+  // ---------- visuals ----------
+  function paintOrb(v, ph){
+    const lvlColor = ph==="recording" ? colorForLive(v) : "var(--moon)";
+    if(!reduceMotion){
+      const scale = 0.7 + v*0.85;
+      pulse.style.transform=`scale(${scale.toFixed(3)})`;
+      pulse.style.opacity = (0.35+v*0.65).toFixed(2);
+    }
+    pulse.style.background=`radial-gradient(circle at 50% 45%, ${cssColor(lvlColor,0.55)}, ${cssColor(lvlColor,0)} 70%)`;
+    ring.style.borderColor = v>0.55 ? cssColor(lvlColor,0.6) : "var(--line)";
+  }
+  function colorForLive(v){
+    if(v<0.32) return COLORS[0];
+    if(v<0.5) return COLORS[1];
+    if(v<0.68) return COLORS[2];
+    return COLORS[3];
+  }
+  function cssColor(c,a){
+    if(c==="var(--moon)") c="#7b97ff";
+    const n=parseInt(c.slice(1),16);
+    return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`;
+  }
+
+  let liveHist=[];
+  function sizeLiveCanvas(){
+    const r=liveCanvas.getBoundingClientRect(), dpr=window.devicePixelRatio||1;
+    liveCanvas.width=r.width*dpr; liveCanvas.height=r.height*dpr;
+    const ctx=liveCanvas.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  function drawLive(v){
+    liveHist.push(v); if(liveHist.length>120) liveHist.shift();
+    const ctx=liveCanvas.getContext("2d");
+    const w=liveCanvas.width/(window.devicePixelRatio||1);
+    const h=liveCanvas.height/(window.devicePixelRatio||1);
+    ctx.clearRect(0,0,w,h);
+    const barW=w/120;
+    for(let i=0;i<liveHist.length;i++){
+      const val=liveHist[i];
+      const bh=Math.max(2,val*(h-12));
+      ctx.fillStyle=colorForLive(val);
+      ctx.globalAlpha=0.35+0.65*(i/liveHist.length);
+      ctx.fillRect(i*barW, (h-bh)/2, barW*0.7, bh);
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // ---------- stop & results ----------
+  async function stop(){
+    phase="done";
+    if(rafId) cancelAnimationFrame(rafId);
+    if(clockId) clearInterval(clockId);
+    if(source) try{source.disconnect();}catch(e){}
+    if(stream) stream.getTracks().forEach(t=>t.stop());
+    if(audioCtx) try{audioCtx.close();}catch(e){}
+    releaseWakeLock();
+    renderResults();
+  }
+
+  function renderResults(){
+    stage.style.display="none";
+    results.style.display="flex";
+
+    const total=samples.length;
+    const endEpoch=startEpoch + total*1000;
+
+    if(total<5){
+      $("scoreBig").textContent="—";
+      $("verdict").textContent="Too short to analyse. Let it run for at least a few minutes.";
+      $("chartRange").textContent="";
+      $("sDur").textContent=fmtDur(total);
+      ["sSnore","sQuiet","sLoud"].forEach(id=>$(id).textContent="—");
+      $("breakdown").innerHTML="";
+      return;
+    }
+
+    // tallies
+    let snoreSec=0, quietSec=0;
+    const lvlSec=[0,0,0,0];
+    for(const s of samples){
+      lvlSec[s.level]++;
+      if(s.snore) snoreSec++;
+      if(s.level===0) quietSec++;
+    }
+
+    // episodes (runs where level>=1), classified by peak level
+    const episodes=[]; let cur=null;
+    for(const s of samples){
+      if(s.level>=1){
+        if(!cur) cur={peak:s.level,len:1}; else {cur.len++; cur.peak=Math.max(cur.peak,s.level);}
+      } else if(cur){ episodes.push(cur); cur=null; }
+    }
+    if(cur) episodes.push(cur);
+    const epByLevel=[0,0,0,0];
+    episodes.forEach(e=>{ if(e.len>=3) epByLevel[e.peak]++; }); // ignore <3s blips
+    const loudEpisodes=epByLevel[2]+epByLevel[3];
+
+    // snore score 0-100: weighted load of snoring time
+    const load = (lvlSec[1]*1 + lvlSec[2]*3 + lvlSec[3]*6);
+    const score = Math.min(100, Math.round( (load/total) * 28 ));
+    $("scoreBig").textContent=score;
+    $("verdict").textContent=verdictFor(score);
+
+    // stats
+    $("sDur").textContent=fmtDur(total);
+    $("sSnore").innerHTML = fmtDur(snoreSec)+` <small>${Math.round(snoreSec/total*100)}%</small>`;
+    $("sQuiet").innerHTML = Math.round(quietSec/total*100)+`<small>%</small>`;
+    $("sLoud").textContent=loudEpisodes;
+
+    // chart range labels
+    $("chartRange").textContent = `${clockTime(startEpoch)} – ${clockTime(endEpoch)}`;
+    $("axStart").textContent=clockTime(startEpoch);
+    $("axMid").textContent=clockTime(startEpoch+total*500);
+    $("axEnd").textContent=clockTime(endEpoch);
+
+    // breakdown rows
+    const bd=$("breakdown"); bd.innerHTML="";
+    for(let l=1;l<=3;l++){
+      const row=document.createElement("div"); row.className="brow";
+      row.innerHTML=`<span class="lab"><b style="background:${COLORS[l]}"></b>${NAMES[l]}</span>
+        <span class="val">${fmtDur(lvlSec[l])} · ${epByLevel[l]} episode${epByLevel[l]===1?"":"s"}</span>`;
+      bd.appendChild(row);
+    }
+
+    drawChart(samples);
+  }
+
+  function verdictFor(s){
+    if(s<8)  return "A calm, quiet night.";
+    if(s<22) return "Mild — a little snoring here and there.";
+    if(s<45) return "Moderate — noticeable snoring through parts of the night.";
+    if(s<70) return "Heavy — long or loud stretches of snoring.";
+    return "Very heavy — sustained loud snoring. Worth mentioning to a doctor.";
+  }
+
+  // ---------- night chart ----------
+  function drawChart(data){
+    const cv=$("chart"), dpr=window.devicePixelRatio||1;
+    const r=cv.getBoundingClientRect();
+    cv.width=r.width*dpr; cv.height=170*dpr;
+    const ctx=cv.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0);
+    const W=r.width, H=170, base=H-14;
+    ctx.clearRect(0,0,W,H);
+
+    // baseline + faint grid
+    ctx.strokeStyle="rgba(255,255,255,.06)";
+    ctx.lineWidth=1;
+    ctx.beginPath(); ctx.moveTo(0,base); ctx.lineTo(W,base); ctx.stroke();
+
+    const cols=Math.floor(W);
+    const per=data.length/cols;
+    for(let x=0;x<cols;x++){
+      const a=Math.floor(x*per), b=Math.max(a+1,Math.floor((x+1)*per));
+      let peak=0;
+      for(let i=a;i<b && i<data.length;i++) if(data[i].level>peak) peak=data[i].level;
+      if(peak===0){
+        // quiet tick
+        ctx.fillStyle="rgba(67,192,166,.5)";
+        ctx.fillRect(x,base-2,1,2);
+        continue;
+      }
+      const hgt=[0,18,40,base-6][peak];
+      ctx.fillStyle=COLORS[peak];
+      ctx.fillRect(x, base-hgt, 1, hgt);
+    }
+  }
+
+  // ---------- wake lock ----------
+  async function requestWakeLock(){
+    try{
+      if("wakeLock" in navigator){
+        wakeLock = await navigator.wakeLock.request("screen");
+        wakeLock.addEventListener("release", ()=>{ wakeLock=null; });
+      }
+    }catch(e){ wakeLock=null; }
+  }
+  function releaseWakeLock(){ if(wakeLock){ try{wakeLock.release();}catch(e){} wakeLock=null; } }
+  document.addEventListener("visibilitychange", async ()=>{
+    if(document.visibilityState==="visible" && phase==="recording" && wakeLock===null){
+      await requestWakeLock();
+      awakeNote.style.display = wakeLock!==null ? "flex":"none";
+    }
+  });
+
+  // ---------- errors ----------
+  function showError(e){
+    let msg="Couldn't start the microphone.";
+    if(e && (e.name==="NotAllowedError"||e.name==="SecurityError"))
+      msg="Microphone access was blocked. Allow the microphone for this page, then tap Start again.";
+    else if(e && e.name==="NotFoundError")
+      msg="No microphone was found on this device.";
+    errBox.innerHTML=`<b>${msg}</b><br>If you opened this inside another app, try opening it directly in Safari — that's where the mic permission prompt works best.`;
+    errBox.style.display="block";
+  }
+
+  // ---------- reset ----------
+  function reset(){
+    samples=[]; liveHist=[]; smoothVol=0; baseline=null;
+    results.style.display="none";
+    stage.style.display="flex";
+    startBtn.classList.remove("hidden");
+    stopBtn.classList.add("hidden");
+    liveMeter.style.display="none";
+    awakeNote.style.display="none";
+    clock.firstChild.textContent="Ready";
+    clockSub.textContent="tap start";
+    statHead.textContent="Listen through the night";
+    statSub.textContent="Place the phone face-down on the mattress or a nightstand within arm's reach. Keep it plugged in.";
+    phase="idle";
+  }
+
+  // ---------- save image ----------
+  function saveImage(){
+    const src=$("chart");
+    const dpr=window.devicePixelRatio||1;
+    const out=document.createElement("canvas");
+    out.width=src.width; out.height=src.height+90*dpr;
+    const ctx=out.getContext("2d");
+    ctx.fillStyle="#0e1428"; ctx.fillRect(0,0,out.width,out.height);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    const w=out.width/dpr;
+    ctx.fillStyle="#eef1fb"; ctx.font="600 18px -apple-system,sans-serif";
+    ctx.fillText("Night Listener — "+($("chartRange").textContent||""), 14, 28);
+    ctx.fillStyle="#8b94b3"; ctx.font="13px -apple-system,sans-serif";
+    ctx.fillText(`Snore Score ${$("scoreBig").textContent} · snoring ${$("sSnore").textContent.replace(/<[^>]+>/g,"")} · quiet ${$("sQuiet").textContent.replace(/<[^>]+>/g,"")}%`, 14, 50);
+    ctx.drawImage(src, 0, 70, w, 170);
+    const a=document.createElement("a");
+    a.download="night-listener.png";
+    a.href=out.toDataURL("image/png");
+    a.click();
+  }
+
+  // ---------- wire up ----------
+  startBtn.addEventListener("click", start);
+  stopBtn.addEventListener("click", stop);
+  againBtn.addEventListener("click", reset);
+  saveBtn.addEventListener("click", saveImage);
+  window.addEventListener("resize", ()=>{ if(phase==="calibrating"||phase==="recording") sizeLiveCanvas(); });
+
+})();
+</script>
+</body>
+</html>
